@@ -200,9 +200,21 @@ end
 
 -- Text of the current Visual selection, honouring 'selection'.
 local function region_text()
-    local text = table.concat(vim.fn.getregion(vim.fn.getpos("v"), vim.fn.getpos("."), { type = vim.fn.mode() }), "\n")
-    if vim.fn.mode() == "V" then
+    local mode = vim.fn.mode()
+    local vpos, cpos = vim.fn.getpos("v"), vim.fn.getpos(".")
+    local text = table.concat(vim.fn.getregion(vpos, cpos, { type = mode }), "\n")
+    if mode == "V" then
         text = text .. "\n"
+    elseif mode == "v" and vim.o.selection == "exclusive" and vpos[2] ~= cpos[2] then
+        -- With 'selection' exclusive, a charwise selection whose end sits at the
+        -- start of a line (column 1) is treated by the real yank/delete as
+        -- inclusive through the end of the previous line, but getregion drops
+        -- that trailing newline.  Restore it so kills keep trailing empty rows
+        -- (and C-y later lands the cursor on the expected line).
+        local endpos = (vpos[2] < cpos[2] or (vpos[2] == cpos[2] and vpos[3] <= cpos[3])) and cpos or vpos
+        if endpos[3] == 1 then
+            text = text .. "\n"
+        end
     end
     return text
 end
