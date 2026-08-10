@@ -175,6 +175,22 @@ vim.cmd("stopinsert")
 check("kill_region removes selection", buf_lines(), { "pick  up" })
 check("kill_region ring entry", vim.fn.getreg('"'), "this")
 
+-- Kill region spanning whole rows down to trailing empty lines: the
+-- exclusive selection ends in column 1, which the real delete treats as
+-- inclusive through the previous line's end.  getregion drops that trailing
+-- newline, so kill_region must restore it or the empty rows are lost and the
+-- later yank lands the cursor on the wrong line.
+set_buffer({ "one", "two", "", "", "" }, 1, 0)
+vim.cmd("normal! v")
+vim.api.nvim_win_set_cursor(0, { 5, 0 })
+killring.kill_region()
+vim.cmd("stopinsert")
+check("kill_region keeps trailing empty rows in ring", vim.fn.getreg('"'), "one\ntwo\n\n\n")
+check("kill_region removed all selected rows", buf_lines(), { "" })
+killring.yank()
+check("yank restores trailing empty rows", buf_lines(), { "one", "two", "", "", "" })
+check("cursor lands past restored rows", vim.api.nvim_win_get_cursor(0), { 5, 0 })
+
 -- Copy region
 set_buffer({ "copy that text" }, 1, 5)
 vim.cmd("normal! v")
